@@ -1,0 +1,113 @@
+Detección de Anomalías Cardíacas con predictor LMS
+
+1) Planteo del problema y criterios:
+Para detectar una anomalía los médicos miran una señal temporal (o varias si hay
+	varios canales) y se fijan que ciertos parámetros (Ritmo cardíaco, intervalos PR y
+	QR, eje eléctrico cardíaco, etc) estén dentro de los valores aceptables.
+	La idea es poder mecanizar el análisis de un electrocardiograma de manera eficiente
+	y eficaz, es decir: de manera efectiva.
+
+	La eficiencia podría plantearse desde el punto de vista de la velocidad de análisis.
+	Esto implica que sea deseable una baja complejidad computacional para el algoritmo
+	que se implemente. Esto podría dar el pie para decir el porqué usamos LMS.
+	La eficacia debería plantearse desde el punto de vista de los falsos positivos, 
+	falsos negativos, y el nivel de detalle del resultado (si solo detecta anomalías	
+	en general o si especifica que tipo de anomalía hay, o una probabilidad de anomalía).
+	Aquí entra en juego el esquema del modelo a implementar y el tipo de algoritmo LMS
+	a utilizar (NLMS, o FAST BLOCK LMS, etc). El tipo de LMS a utilizar también puede
+	elegirse teniendo en cuenta el criterio de eficiencia además de la eficacia.
+
+	Vale la pena aclarar reafirmar: El objetivo es dar con el algoritmo más efectivo
+	para "mecanizar" la detección de anomalías cardíacas. El alcance es la rama de 
+	algoritmos predictores LMS.
+	
+
+2) Se usa el database MIT-BIH-DATABASE que se puede leer con RDSAMP y RDANN.
+	a)Tiene dos canales (osea puede tomar las mediciones de dos partes del cuerpo)
+		Se podrían utilizar los dos canales (dos señales) para generar una sola
+		señal. Habría que justificar mediante investigación como juntar las señales
+		(tal vez promediarlas es la mejor forma de juntarlas) y también si es mejor
+		juntarlas o solamente elegir una de ellas. En este último caso cual sería
+		la mejor a elegir?...Tal vez es mejor tratar los dos canales por separado
+		y después comparar... hay que ver... hay que ver...
+
+		Algunas mediciones tienen un solo canal, ya que no se conectó uno de los 
+		electrodos, mientras que otras mediciones se encuentran invertidas, porque 
+		se conectaron los electrodos al revés, por ende habría que tener en cuenta
+		estos dos factores a la hora de tomar información de los canales.
+
+	
+	b)Hay dos grupos de pacientes a partir de los cuales se generaró la base de datos:
+	  un grupo de pacientes con anomalías comunes (número de grabaciones 100 a 124) y
+          otro grupo con anomalías mas raras de detectar (número de grabaciones de 200 a 234).
+
+		Se podrías separar las grabaciones en estos dos grupos para luego evaluar los 
+		resultados por separado, o para tener en cuenta la diferenciación a la hora de
+		utilizar las grabaciones.
+
+	c)Se puede leer con la librería WFDB (Waveform Database), específicamente con las
+	  funciones RDSAMP y RDANN.
+		RDSAMP devuelve los canales con las señales que consisten en muestras en
+		función del tiempo.
+		RDANN devuelve las anotaciones sobre los canales, (información sobre si 
+		hay anomalía o no hay anomalía, etc).
+
+	d)Las señales de esta base de datos no presentan una SNR tan mala en general, 
+	  pero si tienen ruido de línea (de 60Hz) y algunos acoplamientos de continua
+	  que pudieron ser ocasionados por movimientos musculares del paciente a la hora
+	  de ser evaluado.
+
+		Se puede aplicar un preprocesamiento para quitar el ruido de línea y
+		la continua. Hay papers sobre eso abundantes... Hay varios que a fin de
+		cuentas terminan yendo al paper que usaron Tomi y Ari el año pasado...
+
+
+3) Modelo de detección de anomalía con predictor LMS:
+	a) Metaparámetros: M -> orden del predictor.
+			   D -> tamaño del delay (alcance de la predicción).
+			   L -> tamaño del bloque (L = 1 si no se implementa BLOCK LMS)
+	   Tanto M como D dependeran del largo de la señal de pseudo periódica formada
+	   por el intervalo PR, complejo QRS e intervalo QT en caso de que no se implemente
+	   BLOCK LMS. En caso de block LMS también será el tamaño del bloque "L" el que dependa del
+	   tamaño de esta señal PR-QRS-QT.
+
+	   Para definir estos metaparámetros habría que tener en cuenta la investigación
+	   y simulaciones de montecarlo comparando diferentes alternativas.
+
+	   Por ejemplo, se podría implementar LMS simple, NLMS y signLMS para
+	   M = 1, 2, 3, ..., 19, 20 con D = 1 y comparar cual da mejor resultado
+	   (...¿cómo comparo cuál da mejor?...).
+
+	   Otro ejemplo sería block LMS con el tamaño de bloque "L" igual a múltiplos del
+	   tamaño de la señal de PR-QRS-QT. También se podría investigar FAST BLOCK LMS, 
+	   mezclado con alguno de los LMS modificados (NLMS o signLMS según cuál haya dado
+           mejor de los dos sin BLOCK LMS).
+
+	b) input y output del predictor (TAMBIEN ES OTRO METAPARAMETRO): 
+		se supone tiempo real, solo se tienen los datos que se 
+		midieron desde que se conectó el equipo de ECG al paciente.
+		b.1)	
+			input: M muestras de electrocardiogramas (u(n - M), ..., u(n - 1))
+			output: u(n), consiste en una sola muestra.
+		b.2)
+			input: M bloques de electrocardiogramas.
+			output: bloque siguiente.
+
+		b.x1)    esquema de b.x (x = 1, 2, ...), teniendo en cuenta que las señales
+			se asumen "sanas" (sin anomalías).
+			la salida se asume sana.
+		b.x2)	esquema de b.x, teniendo en cuenta que las señales de entrada 
+			pueden llegar a ser tanto sanas  como anómalas, y la sálida se
+			supone sana... (me parece que si se usa el b.x1 mejor...).
+		b.23)   esquema de b.2, teniendo en cuenta que las señales pueden llegar a
+			ser sanas o pueden llegar a ser anómalas.
+			la sálida se evalúa según criterios estándares, si dá anómala quiere
+			decir que se generó con señales anómalas (pero no se identifica cual, además puede generar
+			muchos falsos negativos).  
+	suponemos que no tiene sentido generar una predicción con D > 1 ya que se podría
+	cometer más error (según sentido común, no se como probarlo, podríamos investigarlo...)
+
+¿Cómo saber que metaparámetros dan mejores resultados?
+		
+	   
+		 
