@@ -107,7 +107,19 @@ Para detectar una anomalía los médicos miran una señal temporal (o varias si 
 	suponemos que no tiene sentido generar una predicción con D > 1 ya que se podría
 	cometer más error (según sentido común, no se como probarlo, podríamos investigarlo...)
 
-¿Cómo saber que metaparámetros dan mejores resultados?
+	c) ¿Cómo saber que metaparámetros dan mejores resultados?¿Métricas?
+		...una opción: El output del filtro adaptativo LMS se puede comparar
+		contra la señal deseada y obtener así el valor absoluto del error, 
+		el cual se puede comparar contra un umbral para decidir si se detecta 
+		anomalía o no.
+		El umbral puede ser fijo y calculado según investigaciones sobre el tema, 
+		o podría ser adaptativo según la señal deseada. Esto último se podría
+		hacer calculando señales auxiliares a la señal deseada pero que aún sean lo
+		suficientemente parecidas como para ser considerada una posible señal deseada, 
+		según criterios médicos que habría que investigar (por ejemplo puede ser la misma
+		señal deseada pero shifteada algunos milisegundos), y así definir el umbral
+		como el máximo error entre estas señales auxiliares (o solo generar una señal
+		auxiliar que ya te de el error del umbral).
 		
 	   
 		 
